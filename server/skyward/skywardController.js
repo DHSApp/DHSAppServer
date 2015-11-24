@@ -1,4 +1,30 @@
+
 var request = require('request');
+
+
+
+var requestGrades = function (sessionid, cb) {
+
+
+  var gradeBookParser = function(page) {
+
+  }
+
+  request({
+    url: 'https://skywarddhs.isg.edu.sa/scripts/wsisa.dll/WService=wsEAPlusDHS/sfgradebook001.w',
+    method: 'POST',
+    form: 'sessionid=' + sessionid,
+  }, function(err, res, body){
+
+    if (err) {
+      // deal with it later
+    }
+
+    gradeBookParser(body);
+
+    cb(body);
+  })
+}
 
 var authUser = function(user, pass, cb) {
 
@@ -32,17 +58,24 @@ var authUser = function(user, pass, cb) {
       // deal with it later
     }
 
-    console.log(authParser(body));
+    cb(authParser(body));
   })
 
 }
 
 module.exports = {
   getGradeBook : function  (req, res) {
+
     var username = req.body.username;
     var password = req.body.password;
-    authUser(username, password);
-    res.send(200);
+
+    authUser(username, password, function(userData) {
+      requestGrades(userData.sessionid, function(data){
+        res.send(data);
+      })
+    });
+
+    
   }
 }
 
