@@ -2,9 +2,46 @@
 var request = require('request');
 var htmlparser = require("htmlparser2");
 
-var requestGrades = function (sessionid, cb) {
+var requestGrades = function (userdata, cb) {
+  var sessionid = userdata.sessionid;
 
-  var domSearcher = function(domTree) {
+  var courseRequester = function (courses, userdata, cb) {
+    var responses = [];
+    var numObjs = Object.keys(courses).length;
+    for (var key in courses) {
+      individualCourseRequest(userdata, key, function(body){
+        responses.push(body);
+        if (responses.length === numObjs) {
+          cb(responses);
+        }
+      })
+    }
+  }
+
+
+  var individualCourseRequest = function (userdata, courseid, cb) {
+    var options = { method: 'POST',
+      url: 'https://skywarddhs.isg.edu.sa/scripts/wsisa.dll/WService=wsEAPlusDHS/httploader.p',
+      qs: { file: 'sfgradebook001.w' },
+      form: 
+       { action: 'viewGradeInfoDialog',
+         bucket: 'SEM 1',
+         corNumId: courseid,
+         fromHttp: 'yes',
+         ishttp: 'true',
+         sessionid: userdata.sessionid,
+         stuId: userdata.nameid } 
+    };
+
+    request(options, function (error, response, body) {
+      if (error) throw new Error(error);
+
+      cb(body);
+    });
+
+  }
+
+  var domSearcher = function(domTree, cb) {
     var findBody = function (domTree) {
       for (var i = 0; i < domTree.length; i++) {
         if (domTree[i].name === "html") {
@@ -20,13 +57,13 @@ var requestGrades = function (sessionid, cb) {
       }  
     }
 
-    var findGradeTables = function(body, id) {
-
-      var tables = [];
+    var findCourseIds = function(body, id) {
+      var ids = {};
 
       var recurseSearch = function(element, id) {
         if (element.name === "table" && element.attribs.id.substring(0, id.length) === "grid_classDesc") {
-          tables.push(element);
+          var courseId = element.attribs.id.split('_')[3];
+          ids[courseId] = courseId;
         }
 
         if (element.children) {
@@ -37,23 +74,14 @@ var requestGrades = function (sessionid, cb) {
       }
 
       recurseSearch(body, id);
-      return tables;
+      return ids;
     }
 
-    var circularRemoval = function(elements) {
-      for (var i = 0; i < elements.length; i++) {
-        delete elements[i].prev;
-        delete elements[i].next;
-        delete elements[i].parent;
-        if (elements[i].children) {
-          circularRemoval(elements[i].children);
-        }
-      }
-    }
 
-    var x = findGradeTables(findBody(domTree), "grid_classDesc");
-    circularRemoval(x);
-    return x;
+    var x = findCourseIds(findBody(domTree), "grid_classDesc");
+    courseRequester(x, userdata, function(data){
+      cb(data);
+    })
   }
 
   var gradeBookParser = function(page, cb) {
@@ -62,7 +90,9 @@ var requestGrades = function (sessionid, cb) {
       if (error) { 
           
       } else {
-        cb(domSearcher(dom));
+        domSearcher(dom, function(data){
+          cb(data);
+        })
       }
     });
     var parser = new htmlparser.Parser(handler);
@@ -71,6 +101,9 @@ var requestGrades = function (sessionid, cb) {
     
   }
 
+
+
+  // Fetch the gradebook data.
   request({
     url: 'https://skywarddhs.isg.edu.sa/scripts/wsisa.dll/WService=wsEAPlusDHS/sfgradebook001.w',
     method: 'POST',
@@ -82,13 +115,18 @@ var requestGrades = function (sessionid, cb) {
     }
 
     
-
+    // Parse. This method deals with that.
     gradeBookParser(body, function(data){
       cb(data);
     });
   })
 }
 
+
+
+
+
+// Authenticates user, gains a session ID
 var authUser = function(user, pass, cb) {
 
   var authParser = function(data) {
@@ -126,6 +164,16 @@ var authUser = function(user, pass, cb) {
 
 }
 
+
+
+
+
+
+
+
+
+
+
 module.exports = {
   getGradeBook : function  (req, res) {
 
@@ -133,7 +181,7 @@ module.exports = {
     var password = req.body.password;
 
     authUser(username, password, function(userData) {
-      requestGrades(userData.sessionid, function(data){
+      requestGrades(userData, function(data){
         res.send(data);
       })
     });
