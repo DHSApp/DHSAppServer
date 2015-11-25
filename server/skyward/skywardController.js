@@ -1,13 +1,74 @@
 
 var request = require('request');
-
-
+var htmlparser = require("htmlparser2");
 
 var requestGrades = function (sessionid, cb) {
 
+  var domSearcher = function(domTree) {
+    var findBody = function (domTree) {
+      for (var i = 0; i < domTree.length; i++) {
+        if (domTree[i].name === "html") {
 
-  var gradeBookParser = function(page) {
+          var html = domTree[i];
+          for (var i = 0; i < html.children.length; i++) {
+            if (html.children[i].name === "body") {
+              return html.children[i];
+            }
+          }
 
+        }
+      }  
+    }
+
+    var findGradeTables = function(body, id) {
+
+      var tables = [];
+
+      var recurseSearch = function(element, id) {
+        if (element.name === "table" && element.attribs.id.substring(0, id.length) === "grid_classDesc") {
+          tables.push(element);
+        }
+
+        if (element.children) {
+          element.children.forEach(function(element){
+            recurseSearch(element, id);
+          })        
+        }
+      }
+
+      recurseSearch(body, id);
+      return tables;
+    }
+
+    var circularRemoval = function(elements) {
+      for (var i = 0; i < elements.length; i++) {
+        delete elements[i].prev;
+        delete elements[i].next;
+        delete elements[i].parent;
+        if (elements[i].children) {
+          circularRemoval(elements[i].children);
+        }
+      }
+    }
+
+    var x = findGradeTables(findBody(domTree), "grid_classDesc");
+    circularRemoval(x);
+    return x;
+  }
+
+  var gradeBookParser = function(page, cb) {
+    var rawHtml = page;
+    var handler = new htmlparser.DomHandler(function (error, dom) {
+      if (error) { 
+          
+      } else {
+        cb(domSearcher(dom));
+      }
+    });
+    var parser = new htmlparser.Parser(handler);
+    parser.write(rawHtml);
+    parser.done();
+    
   }
 
   request({
@@ -20,9 +81,11 @@ var requestGrades = function (sessionid, cb) {
       // deal with it later
     }
 
-    gradeBookParser(body);
+    
 
-    cb(body);
+    gradeBookParser(body, function(data){
+      cb(data);
+    });
   })
 }
 
