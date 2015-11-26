@@ -4,12 +4,23 @@ var htmlparser = require("htmlparser2");
 
 // <span class='fwn'>
 
-var recurseDom = function(body, decider, segment){
-  var targets = [];
+var recurseDom = function(body, decider, segment, hash){
+  var targets;
+  if (hash) {
+    targets = {};
+  } else {
+    targets = [];
+  }
+
 
   var recurseSearch = function(element) {
     if (decider(element)) {
-      targets.push(segment(element));
+      var val = segment(element);
+      if (hash) {
+        targets[val] = [];
+      } else {
+        targets.push(val);
+      }
     }
 
     if (element.children) {
@@ -29,6 +40,50 @@ var requestGrades = function (userdata, cb) {
 
   var finalClassDataParser = function(arr, cb) {
 
+    var getassignments = function(categories) {
+      var grades = {}
+      for (var i = 0; i < categories.length; i ++) {
+
+
+        var location = categories[i].data;
+        grades[location] = [];
+
+        var catStart = categories[i].parent.parent.next.next;
+        while (true) {
+
+
+          if (!catStart || catStart.attribs.class === "sf_Section cat") {
+            
+            if (catStart && catStart.prev.prev.attribs.class === "sf_Section cat" && catStart.next.next) {
+              catStart = catStart.next.next;
+              continue;
+            } 
+
+            break;
+
+          }
+
+          var unavaibile = catStart.children[0].children[0].data.charAt(0) === "T" ? true : false;
+          if (unavaibile) {
+            grades[location].push({unavaibile: true});
+          } else {
+            grades[location].push(
+              {
+                date: catStart.children[0].children[0].data, 
+                name: catStart.children[1].children[0].children[0].data,
+                grade: [catStart.children[2].children[0].data.trim(), catStart.children[2].children[2].data.trim()]
+              });
+          }
+          
+
+          catStart = catStart.next.next;
+        }
+
+      }
+
+      return grades;
+
+    }
 
     var analyzeDoms = function(doms) {
 
@@ -52,6 +107,28 @@ var requestGrades = function (userdata, cb) {
           }
 
         )
+
+        
+
+        var categories = recurseDom({children: doms[i]}, 
+          function(element){
+            if (element.attribs && element.attribs.style === "padding:0px 0px 0px 2px !important;background-color:#C9D6E4 !important;font-weight:bold !important") {
+              return true;
+            }
+            return false;
+
+          },
+
+          function(element) {
+            return element.children[0];
+          }
+
+        )
+
+        console.log(currentClass.name);
+        currentClass.categories = getassignments(categories);
+        console.log();
+
         classes.push(currentClass);
         
       }
