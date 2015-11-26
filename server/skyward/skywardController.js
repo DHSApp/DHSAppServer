@@ -2,8 +2,97 @@
 var request = require('request');
 var htmlparser = require("htmlparser2");
 
+// <span class='fwn'>
+
+var recurseDom = function(body, decider, segment){
+  var targets = [];
+
+  var recurseSearch = function(element) {
+    if (decider(element)) {
+      targets.push(segment(element));
+    }
+
+    if (element.children) {
+      element.children.forEach(function(element){
+        recurseSearch(element);
+      })        
+    }
+  }
+
+  recurseSearch(body);
+  return targets;
+
+}
+
 var requestGrades = function (userdata, cb) {
   var sessionid = userdata.sessionid;
+
+  var finalClassDataParser = function(arr, cb) {
+
+
+    var analyzeDoms = function(doms) {
+
+      var classes = [];
+      for (var i = 0; i < doms.length; i++) {
+        var currentClass = {};
+
+        currentClass.name = doms[i][0].children[0].children[0].data;
+        currentClass.period = doms[i][0].children[2].children[1].children[0].data;
+        currentClass.grade = recurseDom({children: doms[i]}, 
+          function(element){
+            if (element.attribs && element.attribs.style === "float:left;display:inline;padding-left:5px;font-weight:normal;font-style:italic;") {
+              return true;
+            }
+            return false;
+
+          },
+
+          function(element) {
+            return element.children[0].data;
+          }
+
+        )
+        classes.push(currentClass);
+        
+      }
+
+
+      return classes;
+
+    }
+
+    var createDoms = function (arr, cb) {
+
+      var total = arr.length;
+      var doms = [];
+
+      for (var i = 0; i < arr.length; i++) {
+
+        var handler = new htmlparser.DomHandler(function (error, dom) {
+          if (error) { 
+              
+          } else {
+
+            doms.push(dom);
+
+            if (doms.length === total) cb(doms);
+          }
+        });
+
+        var parser = new htmlparser.Parser(handler);
+        parser.write(arr[i]);
+        parser.done();
+
+      
+      }
+    }
+
+
+    createDoms(arr, function(doms) {
+      cb(analyzeDoms(doms));
+    })
+
+  }
 
   var courseRequester = function (courses, userdata, cb) {
     var responses = [];
@@ -36,7 +125,8 @@ var requestGrades = function (userdata, cb) {
     request(options, function (error, response, body) {
       if (error) throw new Error(error);
 
-      cb(body);
+      var gradeHTML = body.substring(body.indexOf("<span class='fWn'>"), body.indexOf(']]') - 2);
+      cb(gradeHTML);
     });
 
   }
@@ -80,7 +170,11 @@ var requestGrades = function (userdata, cb) {
 
     var x = findCourseIds(findBody(domTree), "grid_classDesc");
     courseRequester(x, userdata, function(data){
-      cb(data);
+      // cb(data);
+      finalClassDataParser(data, function(doms){
+        // console.log(doms);
+        cb(doms);
+      })
     })
   }
 
@@ -100,6 +194,7 @@ var requestGrades = function (userdata, cb) {
     parser.done();
     
   }
+
 
 
 
@@ -163,13 +258,6 @@ var authUser = function(user, pass, cb) {
   })
 
 }
-
-
-
-
-
-
-
 
 
 
