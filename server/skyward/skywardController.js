@@ -125,9 +125,8 @@ var requestGrades = function (userdata, cb) {
 
         )
 
-        console.log(currentClass.name);
+
         currentClass.categories = getassignments(categories);
-        console.log();
 
         classes.push(currentClass);
         
@@ -302,8 +301,8 @@ var requestGrades = function (userdata, cb) {
 var authUser = function(user, pass, cb) {
 
   var authParser = function(data) {
+
     data = data.substring(4, data.length - 5);
-    console.log(data);
     data = data.split("^");
     var newReqData = {};
     newReqData.duserid = data[5];
@@ -313,6 +312,7 @@ var authUser = function(user, pass, cb) {
     newReqData.wfaacl = data[3];
     newReqData.wfaacl_recid = data[2];
     newReqData.nameid = data[4];
+    newReqData.legal = newReqData.dwd.charAt(0) >= '0' && newReqData.dwd.charAt(0) <= '9';
     newReqData.sessionid = newReqData.web_data_recid + "\u0015" +  newReqData.wfaacl_recid;
     return newReqData;
   }
@@ -345,10 +345,20 @@ module.exports = {
     var username = req.body.username;
     var password = req.body.password;
 
+    if (!username || !password || username.length < 1 || password.length < 1) {
+      res.sendStatus(400);
+      return;
+    }
+
     authUser(username, password, function(userData) {
-      requestGrades(userData, function(data){
-        res.send(data);
-      })
+      if (!userData.legal) {
+        res.status(401).send({error: userData.dwd});
+      } else {
+        requestGrades(userData, function(data){
+          res.send(data);
+        })
+      }
+
     });
 
     
