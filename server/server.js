@@ -9,7 +9,7 @@ var server = require('http').Server(app);
 
 app.use(cors());
 
-// mongoose.connect('mongodb://localhost'); // connect to mongo database named shortly
+mongoose.connect('mongodb://localhost'); // connect to mongo database named shortly
 
 require('./config/middleware.js')(app, express);
 
