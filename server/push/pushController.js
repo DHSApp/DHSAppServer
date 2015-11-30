@@ -10,18 +10,19 @@ var sendToken = function(msgData, tokens, cb) {
     }
   }
 
-  var reqData {
+  var reqData = {
     url: "https://push.ionic.io/api/v1/push/",
     method: "POST",
     body: JSONData,
     json: true,
     headers: {
       "X-Ionic-Application-Id": process.env.IONIC_APP_ID,
-      "Authorization": "Basic " + btoa(process.env.IONIC_PRIVATE_APP_ID + ":")
+      "Authorization": "Basic " + new Buffer(process.env.IONIC_PRIVATE_APP_ID + ":").toString('base64')
     }
   }
 
-  request(reqData, function(err, res){
+  request(reqData, function(err, res, body){
+    console.log(body);
     cb(err);
   })
 
