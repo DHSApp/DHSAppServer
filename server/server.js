@@ -1,3 +1,5 @@
+require('dotenv').load();
+
 var express     = require('express'),
     mongoose    = require('mongoose');
 
@@ -6,6 +8,8 @@ var app = express(),
 var server = require('http').Server(app);
 
 app.use(cors());
+
+mongoose.connect('mongodb://' + process.env.DB_USER + ':' + process.env.DB_PASS + '@ds059524.mongolab.com:59524/dhs'); // connect to mongo database named shortly
 
 require('./config/middleware.js')(app, express);
 
